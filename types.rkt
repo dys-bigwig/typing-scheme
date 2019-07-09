@@ -9,13 +9,7 @@
         ,body)
       `(let ([,(car ids) ,(car vals)])
          ,(expand-expr `(let ,(map list (cdr ids) (cdr vals))
-                          ,body)))]
-    [`(λ (,id ,ty)
-         ,body)
-      expr]
-    [`(λ (,id ,ty ,ts ...)
-         ,body)
-      `()]))
+                          ,body)))]))
 ;---------------------------------------------------------------
 ;type-checker
 (require racket/hash)
@@ -31,7 +25,10 @@
 (define (external-form->type texpr)
   (match texpr
     ['int (int)]
-    ['bool (bool)]))
+    ['bool (bool)]
+    [`(λ (,ty)
+         ,body-ty)
+      (proc (external-form->type ty) (external-form->type body-ty))]))
 
 (define (extend-tenv id ty tenv)
   (hash-set tenv id ty))
@@ -73,11 +70,11 @@
     [`(let ([,id ,val])
         ,body)
       (type-of body (extend-tenv id (type-of val tenv) tenv))]
-    [`(λ (,id : ,ty) ,body)
+    [`(λ (( ,id : ,ty)) ,body)
       (type-of-procedure id ty body tenv)]
     [`(,f ,x)
       (type-of-application (type-of f tenv)
                            (type-of x tenv))]))
 
-(type-of '(λ (x : int) (λ (y : int) ((+ x) y))) base-tenv)
+(type->external-form (type-of '((λ ([f : (λ (int) (λ (int) int))]) f) +) base-tenv))
 ;(type-of (expand-expr '(let ([f (λ (x : int) ((+ x) 1))] [y 5]) (f y))) base-tenv)
