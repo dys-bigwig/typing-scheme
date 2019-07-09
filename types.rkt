@@ -1,4 +1,23 @@
 #lang racket
+;;--------------------------------------------------------------
+;;expander
+(define (expand-expr expr)
+  (match expr
+    [`(let ([,id ,val]) ,body)
+     expr]
+    [`(let ([,ids ,vals] ...)
+        ,body)
+      `(let ([,(car ids) ,(car vals)])
+         ,(expand-expr `(let ,(map list (cdr ids) (cdr vals))
+                          ,body)))]
+    [`(λ (,id ,ty)
+         ,body)
+      expr]
+    [`(λ (,id ,ty ,ts ...)
+         ,body)
+      `()]))
+;---------------------------------------------------------------
+;type-checker
 (require racket/hash)
 
 (struct type () #:transparent)
@@ -15,7 +34,7 @@
     ['bool (bool)]))
 
 (define (extend-tenv id ty tenv)
-  (hash-set tenv id (external-form->type ty)))
+  (hash-set tenv id ty))
 
 (define (type->external-form ty)
   (match ty
@@ -27,9 +46,9 @@
            (type->external-form result-type))]))
 
 (define (type-of-procedure id ty body tenv)
-  (let ([arg-type (external-form->type ty)]
-        [result-type (type-of body
-                              (extend-tenv id ty tenv))])
+  (let* ([arg-type (external-form->type ty)]
+         [result-type (type-of body
+                              (extend-tenv id arg-type tenv))])
     (proc arg-type result-type)))
 
 (define (type-of-application rator-type rand-type)
@@ -43,11 +62,17 @@
      (error (format "cannot apply ~s to ~s" (type->external-form rator-type)
                     (type->external-form rand-type)))]))
 
+(define (types-of exprs tenv)
+  (map (curryr type-of tenv) exprs))
+
 (define (type-of expr tenv)
   (match expr
     [(? number?) (int)]
     [(? boolean?) (bool)]
     [(? symbol?) (hash-ref tenv expr)]
+    [`(let ([,id ,val])
+        ,body)
+      (type-of body (extend-tenv id (type-of val tenv) tenv))]
     [`(λ (,id : ,ty) ,body)
       (type-of-procedure id ty body tenv)]
     [`(,f ,x)
@@ -55,3 +80,4 @@
                            (type-of x tenv))]))
 
 (type-of '(λ (x : int) (λ (y : int) ((+ x) y))) base-tenv)
+;(type-of (expand-expr '(let ([f (λ (x : int) ((+ x) 1))] [y 5]) (f y))) base-tenv)
