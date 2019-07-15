@@ -23,8 +23,8 @@
                             ,body)))]
     [`(,f ,x)
       `(,(expand-expr f) ,(expand-expr x))]
-    [`(,f . ,xs)
-      (expand-expr `((,f ,(car xs)) . ,(cdr xs)))]
+    [`(,f x . ,xs)
+      (expand-expr `((,f ,x) . ,xs))]
     [_ expr]))
 ;;;;;;;;;;;;;;;;;;
 #| TYPE-CHECKER |#
