@@ -1,17 +1,34 @@
 #lang racket
-;;--------------------------------------------------------------
-;;expander
+;;;;;;;;;;;;;;;
+#| EXPANDER |#
+;;;;;;;;;;;;;;;
 (define (expand-expr expr)
   (match expr
-    [`(let ([,id ,val]) ,body)
-     expr]
+    [`(let ([,id ,val])
+        ,body)
+     `(,(expand-expr body))]
     [`(let ([,ids ,vals] ...)
         ,body)
       `(let ([,(car ids) ,(car vals)])
          ,(expand-expr `(let ,(map list (cdr ids) (cdr vals))
-                          ,body)))]))
-;---------------------------------------------------------------
-;type-checker
+                          ,body)))]
+    [`(λ ([,id ,ty])
+         ,body)
+      `(λ ([,id ,ty])
+          ,(expand-expr body))]
+    [`(λ ([,ids ,tys] ...)
+         ,body)
+      `(λ ([,(car ids) ,(car tys)])
+          ,(expand-expr `(λ ,(map list (cdr ids) (cdr tys))
+                            ,body)))]
+    [`(,f ,x)
+      `(,(expand-expr f) ,(expand-expr x))]
+    [`(,f . ,xs)
+      (expand-expr `((,f ,(car xs)) . ,(cdr xs)))]
+    [_ expr]))
+;;;;;;;;;;;;;;;;;;
+#| TYPE-CHECKER |#
+;;;;;;;;;;;;;;;;;;
 (require racket/hash)
 
 (struct type () #:transparent)
@@ -67,14 +84,13 @@
     [(? number?) (int)]
     [(? boolean?) (bool)]
     [(? symbol?) (hash-ref tenv expr)]
-    [`(let ([,id ,val])
+    [`(let ([,id  ,val])
         ,body)
       (type-of body (extend-tenv id (type-of val tenv) tenv))]
-    [`(λ (( ,id : ,ty)) ,body)
+    [`(λ (( ,id ,ty)) ,body)
       (type-of-procedure id ty body tenv)]
     [`(,f ,x)
       (type-of-application (type-of f tenv)
                            (type-of x tenv))]))
 
-(type->external-form (type-of '((λ ([f : (λ (int) (λ (int) int))]) f) +) base-tenv))
-;(type-of (expand-expr '(let ([f (λ (x : int) ((+ x) 1))] [y 5]) (f y))) base-tenv)
+(type->external-form (type-of (expand-expr '((λ ([x int] [y int]) (+ x y)) 4 5)) base-tenv))
