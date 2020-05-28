@@ -23,7 +23,7 @@
                             ,body)))]
     [`(,f ,x)
       `(,(expand-expr f) ,(expand-expr x))]
-    [`(,f x . ,xs)
+    [`(,f ,x . ,xs)
       (expand-expr `((,f ,x) . ,xs))]
     [_ expr]))
 ;;;;;;;;;;;;;;;;;;
